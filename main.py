@@ -1,6 +1,6 @@
 import os
 import threading
-from flask import Flask
+import time
 import telebot
 from groq import Groq
 
@@ -70,11 +70,13 @@ def handle_business_conn(connection):
     print("Business connected:", connection.id)
 
 def run_bot():
-    print("Bot started...", flush=True)
-    try:
-        bot.infinity_polling(skip_pending=True)
-    except Exception as e:
-        print("BOT DIED:", e, flush=True)
+    while True:
+        try:
+            print("Bot started...", flush=True)
+            bot.infinity_polling(skip_pending=True)
+        except Exception as e:
+            print("BOT DIED, retry in 10s:", e, flush=True)
+            time.sleep(10)
 
 threading.Thread(target=run_bot, daemon=True).start()
 if __name__ == "__main__":
