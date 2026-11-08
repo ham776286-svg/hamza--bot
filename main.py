@@ -41,7 +41,7 @@ def chat(message):
     memory[key] = memory[key][-10:]
     try:
         resp = client.chat.completions.create(
-            openai/gpt-oss-20b
+            model="openai/gpt-oss-20b",
             messages=[{"role": "system", "content": SYSTEM_PROMPT}] + memory[key],
             temperature=0.8,
             max_tokens=300
