@@ -70,10 +70,12 @@ def handle_business_conn(connection):
     print("Business connected:", connection.id)
 
 def run_bot():
-    print("Bot started...")
-    bot.infinity_polling()
+    print("Bot started...", flush=True)
+    try:
+        bot.infinity_polling(skip_pending=True)
+    except Exception as e:
+        print("BOT DIED:", e, flush=True)
 
-threading.Thread(target=run_bot).start()
-
+threading.Thread(target=run_bot, daemon=True).start()
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
