@@ -1,83 +1,72 @@
 import os
 import threading
-import time
 import telebot
-from groq import Groq
 from flask import Flask
-TOKEN = os.getenv("BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
-GROQ_KEY = os.getenv("GROQ_API_KEY")
+from groq import Groq
 
-bot = telebot.TeleBot(TOKEN)
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+bot = telebot.TeleBot(BOT_TOKEN)
+client = Groq(api_key=GROQ_API_KEY)
+
 app = Flask(__name__)
-client = Groq(api_key=GROQ_KEY)
-
-memory = {}
-
-SYSTEM_PROMPT = """انت تتكلم باللهجة اليمنية - العدنية
-ردودك قصيرة، خفيفة، مضحكة شوية، وطبيعية زي البشر
-لا تكرر نفس الجملة ابدا
-اذا حد قال الو قله هلا واسأله ايش اخباره بطريقة مختلفة كل مرة
-اذا احد سألك عن حمزة قله هذا صاحبي وصانعني
-لا تقول انك ذكاء اصطناعي الا اذا سألوك
-"""
 
 @app.route('/')
 def home():
-    return "Bot is running!"
+    return "Bot is alive!"
 
-def ask_groq(user_id, text):
-    if user_id not in memory:
-        memory[user_id] = []
-    memory[user_id].append({"role": "user", "content": text})
-    # نخلي الذاكرة اخر 10 رسايل بس
-    memory[user_id] = memory[user_id][-10:]
-    
+def ask_groq(text):
     resp = client.chat.completions.create(
-    model="llama-3.1-8b-instant",
-        messages=[{"role": "system", "content": SYSTEM_PROMPT}] + memory[user_id],
-        temperature=0.8
+        model="openai/gpt-oss-20b",
+        messages=[
+            {"role": "system", "content": "You are Hamza, a helpful friendly assistant. Reply in the same language as the user, in Yemeni dialect if they speak Yemeni."},
+            {"role": "user", "content": text},
+        ],
+        temperature=0.8,
+        max_tokens=800,
     )
-    reply = resp.choices[0].message.content
-    memory[user_id].append({"role": "assistant", "content": reply})
-    return reply
+    return resp.choices[0].message.content
 
-# 1. هذا حق البوت نفسه - لما حد يراسل البوت
-@bot.message_handler(func=lambda message: True)
-def handle_normal(message):
+@bot.message_handler(commands=['start'])
+def start(message):
+    bot.reply_to(message, "هلا والله 🔥 انا حمزة، ارسل لي اي شي وبرد عليك.")
+
+@bot.message_handler(func=lambda m: True)
+def handle_all(message):
     try:
-        reply = ask_groq(message.chat.id, message.text)
+        if not message.text:
+            return
+        reply = ask_groq(message.text)
         bot.reply_to(message, reply)
     except Exception as e:
-        print(e)
+        print(f"Error: {e}")
+        bot.reply_to(message, "صار عندي خطأ بسيط، جرب مرة ثانية.")
 
-# 2. هذا الجديد - حق حسابك الشخصي - لما حد يراسلك انت
-@bot.business_message_handler(func=lambda message: True)
+@bot.business_message_handler(func=lambda m: True)
 def handle_business(message):
     try:
-        # لا ترد على رسايلك انت
-        if message.from_user.id == bot.get_me().id:
+        if not message.text:
             return
-        chat_id = message.chat.id
-        conn_id = message.business_connection_id
-        reply = ask_groq(chat_id, message.text)
-        # نرسل الرد باسم حسابك
-        bot.send_message(chat_id, reply, business_connection_id=conn_id)
+        reply = ask_groq(message.text)
+        bot.reply_to(message, reply)
     except Exception as e:
-        print("business error:", e)
+        print(f"Business Error: {e}")
 
-@bot.business_connection_handler(func=lambda c: True)
-def handle_business_conn(connection):
-    print("Business connected:", connection.id)
+def run_flask():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
 
 def run_bot():
     while True:
         try:
-            print("Bot started...", flush=True)
-            bot.infinity_polling(skip_pending=True)
+            print("Bot started...")
+            bot.infinity_polling(timeout=60, long_polling_timeout=60)
         except Exception as e:
-            print("BOT DIED, retry in 10s:", e, flush=True)
+            print(f"BOT DIED, retry in 10s: {e}")
+            import time
             time.sleep(10)
 
-threading.Thread(target=run_bot, daemon=True).start()
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    threading.Thread(target=run_flask, daemon=True).start()
+    run_bot()
