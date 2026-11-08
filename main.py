@@ -33,7 +33,7 @@ def ask_groq(user_id, text):
     memory[user_id] = memory[user_id][-10:]
     
     resp = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="llama-3.1-8b-instant"
         messages=[{"role": "system", "content": SYSTEM_PROMPT}] + memory[user_id],
         temperature=0.8
     )
